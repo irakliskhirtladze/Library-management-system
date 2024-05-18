@@ -1,0 +1,165 @@
+/* static/css/base.css */
+
+/* General styles */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #fff2f2;
+}
+
+main {
+    max-width: 2000px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+/*Header and footer styles*/
+footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: rgb(189, 183, 183);
+    color: black;
+    text-align: center;
+    padding: 10px;
+}
+
+/*More generic styles*/
+h1 {
+    color: #508c51;
+}
+h2 {
+    color: #ff7300;
+}
+h3 {
+    color: black;
+    font-weight: bold;
+}
+p {
+    margin: 5px 0;
+}
+a {
+    color: blue;
+    font-weight: bold;
+}
+
+ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+/*Form styles*/
+form {
+text-align: center;
+}
+label {
+    display: block;
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 10px;
+}
+input[type="text"],
+input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ccc;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-right: 10px;
+}
+
+input[type="datetime-local"] {
+    width: 15%;
+    padding:10px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 18px;
+    box-sizing: border-box;
+}
+input[type="file"] {
+    width: 65%;
+}
+
+/*Textarea style*/
+textarea {
+    width: 80%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
+    font-family: sans-serif;
+    box-sizing: border-box;
+}
+button {
+    padding: 5px 10px;
+    background-color: #007bff;
+    font-size: 16px;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+button:hover {
+    background-color: #0056b3;
+}
+
+/*Arrange header items*/
+.header {
+    display: flex;
+    flex-direction: column;
+    align-content: center;
+    text-align: center;
+}
+
+/*Genereic container styles*/
+.container {
+    margin: 0 auto;
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+    align-content: center;
+    text-align: center;
+    max-width: 700px;
+}
+.two-column-container {
+    justify-content: space-between;
+    align-items: flex-start;
+    margin: 0 auto;
+    max-width: 800px;
+    display: flex;
+    column-gap: 200px;
+}
+
+/*Table styles*/
+table {
+    border-collapse: separate;
+    text-align: right;
+    width: 100%;
+    border-spacing: 0 5px;
+}
+caption {
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+    padding: 10px;
+    background-color: transparent;
+}
+th, td {
+    padding: 10px;
+}
+
+

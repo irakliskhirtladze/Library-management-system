@@ -1,0 +1,27 @@
+<!-- templates/index.html -->
+{% extends "base.html" %}
+{% block title %}Start page{% endblock title %}
+{% block content %}
+
+<!--Homepage content if user is NOT logged in-->
+{% if not user.is_authenticated %}
+    <p>Please log in to use our library</p>
+    <br><br>
+    <p><a href="{% url 'login' %}">Log In</a></p>
+    <br>
+    <p><a href="{% url 'signup' %}">Sign Up</a></p>
+{% endif %}
+
+
+<!--Homepage content if user is logged in-->
+{% if user.is_authenticated %}
+    Logged in as: {{ user.email }}!
+    <br><br>
+    <p><a href="{% url 'logout' %}">Log Out</a></p>
+    <br>
+<!--    Display content here-->
+{% endif %}
+
+
+
+{% endblock content %}

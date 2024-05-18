@@ -1,0 +1,9 @@
+Fantasy
+Science fiction
+Horror
+Kids
+Historical
+Dystopian
+Detective
+Drama
+Romance

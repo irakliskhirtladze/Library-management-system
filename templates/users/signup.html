@@ -1,0 +1,41 @@
+<!-- templates/registration/signup.html -->
+{% extends "base.html" %}
+{% block title %}Sign Up{% endblock title %}
+{% block content %}
+
+<a href="{% url 'home' %}">Start page</a>
+
+<div class="header">
+    <h1>Sign Up</h1>
+</div>
+
+<div class="container">
+    <form method="post">{% csrf_token %}
+        <label for="email">Email:</label>
+        <input type="text" id="email" name="email" required>
+
+        <label for="password1">Password:</label>
+        <input type="password" id="password1" name="password1" required>
+
+        <label for="password2">Confirm Password:</label>
+        <input type="password" id="password2" name="password2" required>
+
+        <label for="first_name">Name:</label>
+        <input type="text" id="first_name" name="first_name" required>
+
+        <label for="last_name">Surname:</label>
+        <input type="text" id="last_name" name="last_name" required>
+
+        <label for="personal_id">Personal ID:</label>
+        <input type="text" id="personal_id" name="personal_id" required>
+
+        <label for="birth_date">Birth Date:</label>
+        <input type="date" id="birth_date" name="birth_date" required>
+
+        <button type="submit">Sign Up</button>
+    </form>
+    <br><br>
+    <p>Or <a href="{% url 'login' %}">Log in</a> if already registered</p>
+</div>
+
+{% endblock content %}
