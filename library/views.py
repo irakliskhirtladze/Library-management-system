@@ -70,7 +70,21 @@ class BookViewSet(viewsets.ModelViewSet):
 class ReservationViewSet(viewsets.ModelViewSet):
     queryset = Reservation.objects.all()
     serializer_class = ReservationSerializer
-    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['user__email', 'book__title']
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsLibrarian]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    def perform_create(self, serializer):
+        if not self.request.user.is_staff:
+            serializer.save(user=self.request.user)
+        else:
+            serializer.save()
 
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
@@ -82,16 +96,43 @@ class ReservationViewSet(viewsets.ModelViewSet):
 class BorrowViewSet(viewsets.ModelViewSet):
     queryset = Borrow.objects.all()
     serializer_class = BorrowSerializer
-    permission_classes = [IsAdminUser]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['user__email', 'book__title']
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsLibrarian]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    def perform_create(self, serializer):
+        if not self.request.user.is_staff:
+            serializer.save(user=self.request.user)
+        else:
+            serializer.save()
 
     @action(detail=True, methods=['post'])
     def borrow(self, request, pk=None):
         book = self.get_object()
         user = request.user
+        if Borrow.objects.filter(user=user, returned_at__isnull=True).exists():
+            return Response({"detail": "You cannot borrow another book while you have an active borrowing."},
+                            status=status.HTTP_400_BAD_REQUEST)
         due_date = timezone.now() + timezone.timedelta(days=14)
         borrow = Borrow.objects.create(user=user, book=book, due_date=due_date)
         book.quantity -= 1
         book.save()
+        serializer = self.get_serializer(borrow)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def return_book(self, request, pk=None):
+        borrow = self.get_object()
+        borrow.returned_at = timezone.now()
+        borrow.save()
+        borrow.book.quantity += 1
+        borrow.book.save()
         serializer = self.get_serializer(borrow)
         return Response(serializer.data)
 

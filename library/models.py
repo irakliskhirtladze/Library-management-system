@@ -32,11 +32,13 @@ class Reservation(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     book = models.ForeignKey(Book, on_delete=models.CASCADE)
     reserved_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField()
+    expires_at = models.DateTimeField(default=timezone.now() + timezone.timedelta(hours=24))
+    is_active = models.BooleanField(default=True)
 
     def save(self, *args, **kwargs):
-        if not self.expires_at:
-            self.expires_at = self.reserved_at + timezone.timedelta(hours=24)
+        # Ensure only one active reservation per user
+        if self.is_active and Reservation.objects.filter(user=self.user, is_active=True).exists():
+            raise ValueError("This user already has an active reservation.")
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -47,8 +49,21 @@ class Borrow(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     book = models.ForeignKey(Book, on_delete=models.CASCADE)
     borrowed_at = models.DateTimeField(auto_now_add=True)
-    due_date = models.DateTimeField()
+    due_date = models.DateTimeField(default=timezone.now() + timezone.timedelta(days=14))
     returned_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        # Ensure that a user with an active reservation can only borrow the reserved book
+        active_reservations = Reservation.objects.filter(user=self.user, is_active=True)
+        if active_reservations.exists():
+            if not active_reservations.filter(book=self.book).exists():
+                raise ValueError(
+                    "You cannot borrow another book while you have an active reservation for a different book.")
+            else:
+                active_reservation = active_reservations.filter(book=self.book).first()
+                active_reservation.is_active = False
+                active_reservation.save()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.user.email} borrowed {self.book.title}'
