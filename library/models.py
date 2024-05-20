@@ -53,6 +53,15 @@ class Borrow(models.Model):
     returned_at = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
+        # Check if this is an update (existing instance)
+        if self.pk is not None:
+            super().save(*args, **kwargs)
+            return
+
+        # Ensure only one active borrowing per user
+        if Borrow.objects.filter(user=self.user, returned_at__isnull=True).exists():
+            raise ValueError("This user can not borrow a book while having an active borrowing.")
+
         # Ensure that a user with an active reservation can only borrow the reserved book
         active_reservations = Reservation.objects.filter(user=self.user, is_active=True)
         if active_reservations.exists():

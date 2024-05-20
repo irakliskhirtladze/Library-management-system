@@ -17,43 +17,63 @@ from library.serializers import AuthorSerializer, GenreSerializer, BookSerialize
     BorrowSerializer
 
 
-def home(request):
-    return render(request, 'index.html')
-
-
 class AuthorViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing authors.
+    """
     queryset = Author.objects.all()
     serializer_class = AuthorSerializer
 
     def get_permissions(self):
+        """
+        Assign permissions based on action.
+        Only admin users can list or retrieve authors.
+        Only admin users can create, update, or delete authors.
+        """
         if self.action in ['list', 'retrieve']:
-            permission_classes = [permissions.IsAdminUser]  # Normal users shouldn't access Authors
+            permission_classes = [permissions.IsAdminUser]
         else:
             permission_classes = [IsLibrarian]
         return [permission() for permission in permission_classes]
 
 
 class GenreViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing genres.
+    """
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
 
     def get_permissions(self):
+        """
+        Assign permissions based on action.
+        Only admin users can list or retrieve genres.
+        Only admin users can create, update, or delete genres.
+        """
         if self.action in ['list', 'retrieve']:
-            permission_classes = [permissions.IsAdminUser]  # Normal users shouldn't access Genres
+            permission_classes = [permissions.IsAdminUser]
         else:
             permission_classes = [IsLibrarian]
         return [permission() for permission in permission_classes]
 
 
 class BookViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing books.
+    """
     queryset = Book.objects.all()
     serializer_class = BookSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['author', 'genre']  # Add fields to filter by
-    search_fields = ['title', 'author__full_name', 'genre__name']  # Add fields to search by
-    ordering_fields = ['title', 'release_year', 'popularity']  # Add fields to sort by
+    filterset_fields = ['author', 'genre']  # Fields to filter by
+    search_fields = ['title', 'author__full_name', 'genre__name']  # Fields to search by
+    ordering_fields = ['title', 'release_year', 'popularity']  # Fields to sort by
 
     def get_permissions(self):
+        """
+        Assign permissions based on action.
+        All authenticated users can list or retrieve books.
+        Only admin users can create, update, or delete books.
+        """
         if self.action in ['list', 'retrieve']:
             permission_classes = [permissions.IsAuthenticated]
         else:
@@ -61,6 +81,9 @@ class BookViewSet(viewsets.ModelViewSet):
         return [permission() for permission in permission_classes]
 
     def get_queryset(self):
+        """
+        Customize the queryset to include popularity annotation.
+        """
         queryset = super().get_queryset()
         # Count the number of times the book has been borrowed
         queryset = queryset.annotate(popularity=Count('borrow'))
@@ -68,19 +91,42 @@ class BookViewSet(viewsets.ModelViewSet):
 
 
 class ReservationViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing reservations.
+    """
     queryset = Reservation.objects.all()
     serializer_class = ReservationSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['user__email', 'book__title']
 
     def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+        """
+        Assign permissions based on action.
+        All authenticated users can create or cancel reservations.
+        Only admins can create, update, partially update, or delete reservations for other users.
+        """
+        if self.action in ['create', 'cancel']:
+            permission_classes = [IsAuthenticated]
+        elif self.action in ['update', 'partial_update', 'destroy']:
             permission_classes = [IsLibrarian]
         else:
-            permission_classes = [permissions.IsAuthenticated]
+            permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
 
+    def get_queryset(self):
+        """
+        Customize the queryset to filter based on the user.
+        """
+        user = self.request.user
+        if user.is_staff:
+            return Reservation.objects.all()
+        else:
+            return Reservation.objects.filter(user=user, is_active=True)
+
     def perform_create(self, serializer):
+        """
+        Save the reservation instance, ensuring the user field is correctly set.
+        """
         if not self.request.user.is_staff:
             serializer.save(user=self.request.user)
         else:
@@ -88,18 +134,33 @@ class ReservationViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
+        """
+        Custom action to cancel a reservation.
+        """
         reservation = self.get_object()
-        reservation.delete()
+        if reservation.user != request.user and not request.user.is_staff:
+            return Response({"detail": "You do not have permission to cancel this reservation."},
+                            status=status.HTTP_403_FORBIDDEN)
+        reservation.is_active = False
+        reservation.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class BorrowViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing borrowings.
+    """
     queryset = Borrow.objects.all()
     serializer_class = BorrowSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['user__email', 'book__title']
 
     def get_permissions(self):
+        """
+        Assign permissions based on action.
+        All authenticated users can list or retrieve borrowings.
+        Only admins can create, update, partially update, or delete borrowings.
+        """
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             permission_classes = [IsLibrarian]
         else:
@@ -107,6 +168,9 @@ class BorrowViewSet(viewsets.ModelViewSet):
         return [permission() for permission in permission_classes]
 
     def perform_create(self, serializer):
+        """
+        Save the borrowing instance, ensuring the user field is correctly set.
+        """
         if not self.request.user.is_staff:
             serializer.save(user=self.request.user)
         else:
@@ -114,11 +178,16 @@ class BorrowViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def borrow(self, request, pk=None):
+        """
+        Custom action to borrow a book.
+        """
         book = self.get_object()
         user = request.user
+
         if Borrow.objects.filter(user=user, returned_at__isnull=True).exists():
             return Response({"detail": "You cannot borrow another book while you have an active borrowing."},
                             status=status.HTTP_400_BAD_REQUEST)
+
         due_date = timezone.now() + timezone.timedelta(days=14)
         borrow = Borrow.objects.create(user=user, book=book, due_date=due_date)
         book.quantity -= 1
@@ -128,6 +197,9 @@ class BorrowViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def return_book(self, request, pk=None):
+        """
+        Custom action to return a book.
+        """
         borrow = self.get_object()
         borrow.returned_at = timezone.now()
         borrow.save()
@@ -138,6 +210,9 @@ class BorrowViewSet(viewsets.ModelViewSet):
 
 
 class PopularBooksView(APIView):
+    """
+    API view to get the most popular books based on borrow count.
+    """
     def get(self, request):
         books = Book.objects.annotate(borrow_count=Count('borrow')).order_by('-borrow_count')[:10]
         serializer = BookSerializer(books, many=True)
@@ -145,6 +220,9 @@ class PopularBooksView(APIView):
 
 
 class BorrowCountLastYearView(APIView):
+    """
+    API view to get the borrow count for books in the last year.
+    """
     def get(self, request):
         one_year_ago = timezone.now() - timezone.timedelta(days=365)
         books = Book.objects.annotate(borrow_count=Count('borrow', filter=Q(borrow__borrowed_at__gte=one_year_ago)))
@@ -153,6 +231,9 @@ class BorrowCountLastYearView(APIView):
 
 
 class LateReturnsView(APIView):
+    """
+    API view to get the list of late returned books.
+    """
     def get(self, request):
         late_borrows = Borrow.objects.filter(returned_at__gt=F('due_date')).order_by('-returned_at')[:100]
         serializer = BorrowSerializer(late_borrows, many=True)
@@ -160,8 +241,12 @@ class LateReturnsView(APIView):
 
 
 class LateReturningUsersView(APIView):
+    """
+    API view to get the list of users who returned books late.
+    """
     def get(self, request):
-        late_returns = Borrow.objects.filter(returned_at__gt=F('due_date')).values('user').annotate(late_count=Count('id')).order_by('-late_count')[:100]
+        late_returns = Borrow.objects.filter(returned_at__gt=F('due_date')).values('user').\
+                           annotate(late_count=Count('id')).order_by('-late_count')[:100]
         user_ids = [entry['user'] for entry in late_returns]
         users = CustomUser.objects.filter(id__in=user_ids)
         serializer = CustomUserSerializer(users, many=True)
