@@ -7,18 +7,27 @@ User = get_user_model()
 
 
 class AuthorSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Author model.
+    """
     class Meta:
         model = Author
         fields = ['id', 'full_name']
 
 
 class GenreSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Genre model.
+    """
     class Meta:
         model = Genre
         fields = ['id', 'name']
 
 
 class BookSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Book model.
+    """
     author = AuthorSerializer()
     genre = GenreSerializer()
     borrowed_count = serializers.SerializerMethodField()
@@ -73,11 +82,11 @@ class ReservationSerializer(serializers.ModelSerializer):
 
         # Check for active reservations
         if Reservation.objects.filter(user=user, is_active=True).exists():
-            raise serializers.ValidationError("You cannot make another reservation while you have an active one.")
+            raise serializers.ValidationError("You cannot make another reservation while having an active one.")
 
-            # Check for unreturned borrowings
+        # Check for unreturned borrowings
         if Borrow.objects.filter(user=user, returned_at__isnull=True).exists():
-            raise serializers.ValidationError("You cannot make a reservation while you have an unreturned borrowing.")
+            raise serializers.ValidationError("You cannot make a reservation while having an unreturned borrowing.")
 
         return data
 

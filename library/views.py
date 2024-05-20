@@ -1,10 +1,11 @@
-from django.db.models import Count, Q
-from django.shortcuts import render
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import Count, Q, F
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import viewsets, status, permissions, filters
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.exceptions import ValidationError as DRFValidationError
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -64,9 +65,9 @@ class BookViewSet(viewsets.ModelViewSet):
     queryset = Book.objects.all()
     serializer_class = BookSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['author', 'genre']  # Fields to filter by
-    search_fields = ['title', 'author__full_name', 'genre__name']  # Fields to search by
-    ordering_fields = ['title', 'release_year', 'popularity']  # Fields to sort by
+    filterset_fields = ['author', 'genre']
+    search_fields = ['title', 'author__full_name', 'genre__name']
+    ordering_fields = ['title', 'release_year', 'popularity']
 
     def get_permissions(self):
         """
@@ -85,7 +86,6 @@ class BookViewSet(viewsets.ModelViewSet):
         Customize the queryset to include popularity annotation.
         """
         queryset = super().get_queryset()
-        # Count the number of times the book has been borrowed
         queryset = queryset.annotate(popularity=Count('borrow'))
         return queryset
 
@@ -161,11 +161,21 @@ class BorrowViewSet(viewsets.ModelViewSet):
         All authenticated users can list or retrieve borrowings.
         Only admins can create, update, partially update, or delete borrowings.
         """
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'return_book']:
             permission_classes = [IsLibrarian]
         else:
             permission_classes = [permissions.IsAuthenticated]
         return [permission() for permission in permission_classes]
+
+    def get_queryset(self):
+        """
+        Customize the queryset to filter based on the user.
+        """
+        user = self.request.user
+        if user.is_staff:
+            return Borrow.objects.all()
+        else:
+            return Borrow.objects.filter(user=user, returned_at__isnull=True)
 
     def perform_create(self, serializer):
         """
@@ -175,6 +185,19 @@ class BorrowViewSet(viewsets.ModelViewSet):
             serializer.save(user=self.request.user)
         else:
             serializer.save()
+
+    def create(self, request, *args, **kwargs):
+        """
+        Override the create method to handle validation errors and return them as API responses.
+        """
+        try:
+            return super().create(request, *args, **kwargs)
+        except DjangoValidationError as e:
+            # Check if it's a ValidationError and has a message_dict attribute
+            if hasattr(e, 'message_dict'):
+                raise DRFValidationError(e.message_dict)
+            else:
+                raise DRFValidationError(e.messages)
 
     @action(detail=True, methods=['post'])
     def borrow(self, request, pk=None):

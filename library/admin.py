@@ -19,34 +19,11 @@ class ReservationAdminForm(forms.ModelForm):
         model = Reservation
         fields = ['user', 'book', 'expires_at', 'is_active']
 
-    def clean(self):
-        cleaned_data = super().clean()
-        user = cleaned_data.get("user")
-        if Reservation.objects.filter(user=user, is_active=True).exists():
-            raise forms.ValidationError("This user already has an active reservation.")
-        return cleaned_data
-
 
 class BorrowAdminForm(forms.ModelForm):
     class Meta:
         model = Borrow
         fields = ['user', 'book', 'due_date', 'returned_at']
-
-    def clean(self):
-        cleaned_data = super().clean()
-        user = cleaned_data.get("user")
-        book = cleaned_data.get("book")
-
-        if 'returned_at' not in self.changed_data:
-            if Borrow.objects.filter(user=user, returned_at__isnull=True).exists():
-                raise forms.ValidationError("This user already has an active borrowing.")
-
-            active_reservations = Reservation.objects.filter(user=user, is_active=True)
-            if active_reservations.exists():
-                if not active_reservations.filter(book=book).exists():
-                    raise forms.ValidationError("This user cannot borrow another book while "
-                                                "having an active reservation for a different book.")
-            return cleaned_data
 
 
 class BookAdmin(admin.ModelAdmin):
