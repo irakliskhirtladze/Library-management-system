@@ -1,7 +1,10 @@
 from django.utils import timezone
-from rest_framework import serializers
-from library.models import Author, Genre, Book, Reservation, Borrow
 from django.contrib.auth import get_user_model
+
+from rest_framework import serializers
+
+from library.models import Author, Genre, Book, Reservation, Borrow
+from library.validators import validate_no_active_borrowing, validate_no_active_reservation
 
 User = get_user_model()
 
@@ -30,23 +33,11 @@ class BookSerializer(serializers.ModelSerializer):
     """
     author = AuthorSerializer()
     genre = GenreSerializer()
-    borrowed_count = serializers.SerializerMethodField()
-    reservations_count = serializers.SerializerMethodField()
-    total_borrowed_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Book
-        fields = ['id', 'title', 'author', 'genre', 'release_year', 'quantity', 'borrowed_count', 'reservations_count',
-                  'total_borrowed_count']
-
-    def get_borrowed_count(self, obj):
-        return Borrow.objects.filter(book=obj, returned_at__isnull=True).count()
-
-    def get_reservations_count(self, obj):
-        return Reservation.objects.filter(book=obj, is_active=True).count()
-
-    def get_total_borrowed_count(self, obj):
-        return Borrow.objects.filter(book=obj).count()
+        fields = ['id', 'title', 'author', 'genre', 'release_year', 'quantity', 'currently_borrowed_count',
+                  'active_reservations_count', 'total_borrowed_count']
 
 
 class ReservationSerializer(serializers.ModelSerializer):
@@ -71,6 +62,9 @@ class ReservationSerializer(serializers.ModelSerializer):
             self.fields['user'].read_only = True
             self.fields['user'].default = request.user
 
+        # Remove the expires_at field from the serializer input
+        self.fields.pop('expires_at')
+
     def validate(self, data):
         """
         Validate that there are no active reservations or unreturned borrowings for the user.
@@ -80,13 +74,16 @@ class ReservationSerializer(serializers.ModelSerializer):
             data['user'] = request.user
         user = data['user']
 
-        # Check for active reservations
-        if Reservation.objects.filter(user=user, is_active=True).exists():
-            raise serializers.ValidationError("You cannot make another reservation while having an active one.")
+        validate_no_active_borrowing(user)
+        validate_no_active_reservation(user)
 
-        # Check for unreturned borrowings
-        if Borrow.objects.filter(user=user, returned_at__isnull=True).exists():
-            raise serializers.ValidationError("You cannot make a reservation while having an unreturned borrowing.")
+        # # Check for active reservations
+        # if Reservation.objects.filter(user=user, is_active=True).exists():
+        #     raise serializers.ValidationError("You cannot make another reservation while having an active one.")
+        #
+        # # Check for unreturned borrowings
+        # if Borrow.objects.filter(user=user, returned_at__isnull=True).exists():
+        #     raise serializers.ValidationError("You cannot make a reservation while having an unreturned borrowing.")
 
         return data
 
@@ -97,6 +94,11 @@ class ReservationSerializer(serializers.ModelSerializer):
         request = self.context.get('request', None)
         if request and not request.user.is_staff:
             validated_data['user'] = request.user
+
+        # # Set the default expires_at if it's not provided
+        # if 'expires_at' not in validated_data:
+        #     validated_data['expires_at'] = timezone.now() + timezone.timedelta(hours=24)
+
         try:
             return super().create(validated_data)
         except ValueError as e:
@@ -109,6 +111,8 @@ class ReservationSerializer(serializers.ModelSerializer):
         """
         representation = super().to_representation(instance)
         request = self.context.get('request', None)
+        # if request:
+        #     representation.pop('due_date')
         if request and not request.user.is_staff:
             representation.pop('user')
         return representation
@@ -134,22 +138,29 @@ class BorrowSerializer(serializers.ModelSerializer):
         user = data['user']
         book = data['book']
 
-        if 'returned_at' not in self.initial_data:
-            # Check for active borrowings
-            if Borrow.objects.filter(user=user, returned_at__isnull=True).exists():
-                raise serializers.ValidationError("You cannot borrow another book while you have an active borrowing.")
+        validate_no_active_borrowing(user)
+        validate_no_active_reservation(user, book)
 
-            # Check for active reservations
-            active_reservations = Reservation.objects.filter(user=user, is_active=True)
-            if active_reservations.exists() and not active_reservations.filter(book=book).exists():
-                raise serializers.ValidationError("You cannot borrow another book while you have "
-                                                  "an active reservation for a different book.")
+        # if 'returned_at' not in self.initial_data:
+        #     # Check for active borrowings
+        #     if Borrow.objects.filter(user=user, returned_at__isnull=True).exists():
+        #         raise serializers.ValidationError("You cannot borrow another book while you have an active borrowing.")
+        #
+        #     # Check for active reservations
+        #     active_reservations = Reservation.objects.filter(user=user, is_active=True)
+        #     if active_reservations.exists() and not active_reservations.filter(book=book).exists():
+        #         raise serializers.ValidationError("You cannot borrow another book while you have "
+        #                                           "an active reservation for a different book.")
         return data
 
     def create(self, validated_data):
         """
         Create a new borrowing instance.
         """
+        # Set the default due_date if it's not provided
+        if 'due_date' not in validated_data:
+            validated_data['due_date'] = timezone.now() + timezone.timedelta(days=14)
+
         try:
             return super().create(validated_data)
         except ValueError as e:
