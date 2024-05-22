@@ -125,12 +125,25 @@ class ReservationViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """
-        Save the reservation instance, ensuring the user field is correctly set.
+        Save the reservation instance, ensuring the user is correctly chosen if librarian is making the reservation.
         """
         if not self.request.user.is_staff:
             serializer.save(user=self.request.user)
         else:
             serializer.save()
+
+    def create(self, request, *args, **kwargs):
+        """
+        Override the create method to handle validation errors and return them as API responses.
+        """
+        try:
+            return super().create(request, *args, **kwargs)
+        # Check if it's a ValidationError and has a message_dict attribute
+        except DjangoValidationError as e:
+            if hasattr(e, 'message_dict'):
+                raise DRFValidationError(e.message_dict)
+            else:
+                raise DRFValidationError(e.messages)
 
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):

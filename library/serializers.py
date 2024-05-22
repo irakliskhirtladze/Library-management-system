@@ -54,68 +54,17 @@ class ReservationSerializer(serializers.ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         """
-        Initialize the serializer and customize the user field for non-staff users.
+        Set default user to the user field for non-staff users and remove this field from the serializer input.
+        Plus, remove the expires_at field from the serializer input.
         """
         super().__init__(*args, **kwargs)
         request = self.context.get('request', None)
         if request and not request.user.is_staff:
             self.fields['user'].read_only = True
             self.fields['user'].default = request.user
+            self.fields.pop('user')
 
-        # Remove the expires_at field from the serializer input
         self.fields.pop('expires_at')
-
-    def validate(self, data):
-        """
-        Validate that there are no active reservations or unreturned borrowings for the user.
-        """
-        request = self.context.get('request', None)
-        if request and not request.user.is_staff:
-            data['user'] = request.user
-        user = data['user']
-
-        validate_no_active_borrowing(user)
-        validate_no_active_reservation(user)
-
-        # # Check for active reservations
-        # if Reservation.objects.filter(user=user, is_active=True).exists():
-        #     raise serializers.ValidationError("You cannot make another reservation while having an active one.")
-        #
-        # # Check for unreturned borrowings
-        # if Borrow.objects.filter(user=user, returned_at__isnull=True).exists():
-        #     raise serializers.ValidationError("You cannot make a reservation while having an unreturned borrowing.")
-
-        return data
-
-    def create(self, validated_data):
-        """
-        Create a new reservation instance.
-        """
-        request = self.context.get('request', None)
-        if request and not request.user.is_staff:
-            validated_data['user'] = request.user
-
-        # # Set the default expires_at if it's not provided
-        # if 'expires_at' not in validated_data:
-        #     validated_data['expires_at'] = timezone.now() + timezone.timedelta(hours=24)
-
-        try:
-            return super().create(validated_data)
-        except ValueError as e:
-            raise serializers.ValidationError(str(e))
-
-    def to_representation(self, instance):
-        """
-        Customize the representation of the reservation instance.
-        Remove the user field for non-staff users.
-        """
-        representation = super().to_representation(instance)
-        request = self.context.get('request', None)
-        # if request:
-        #     representation.pop('due_date')
-        if request and not request.user.is_staff:
-            representation.pop('user')
-        return representation
 
 
 class BorrowSerializer(serializers.ModelSerializer):
@@ -131,46 +80,9 @@ class BorrowSerializer(serializers.ModelSerializer):
         model = Borrow
         fields = ['id', 'user', 'book', 'borrowed_at', 'due_date', 'returned_at']
 
-    def validate(self, data):
+    def __init__(self, *args, **kwargs):
         """
-        Validate that there are no active borrowings or unreturned borrowings for the user.
+        Remove the due_date field from the serializer input
         """
-        user = data['user']
-        book = data['book']
-
-        validate_no_active_borrowing(user)
-        validate_no_active_reservation(user, book)
-
-        # if 'returned_at' not in self.initial_data:
-        #     # Check for active borrowings
-        #     if Borrow.objects.filter(user=user, returned_at__isnull=True).exists():
-        #         raise serializers.ValidationError("You cannot borrow another book while you have an active borrowing.")
-        #
-        #     # Check for active reservations
-        #     active_reservations = Reservation.objects.filter(user=user, is_active=True)
-        #     if active_reservations.exists() and not active_reservations.filter(book=book).exists():
-        #         raise serializers.ValidationError("You cannot borrow another book while you have "
-        #                                           "an active reservation for a different book.")
-        return data
-
-    def create(self, validated_data):
-        """
-        Create a new borrowing instance.
-        """
-        # Set the default due_date if it's not provided
-        if 'due_date' not in validated_data:
-            validated_data['due_date'] = timezone.now() + timezone.timedelta(days=14)
-
-        try:
-            return super().create(validated_data)
-        except ValueError as e:
-            raise serializers.ValidationError(str(e))
-
-    def update(self, instance, validated_data):
-        """
-        Update the borrowing instance.
-        """
-        try:
-            return super().update(instance, validated_data)
-        except ValueError as e:
-            raise serializers.ValidationError(str(e))
+        super().__init__(*args, **kwargs)
+        self.fields.pop('due_date')
