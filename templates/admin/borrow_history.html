@@ -1,0 +1,25 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+  <h1>Borrow History for {{ book.title }}</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Borrowed At</th>
+        <th>Due Date</th>
+        <th>Returned At</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for borrow in borrows %}
+        <tr>
+          <td>{{ borrow.user.email }}</td>
+          <td>{{ borrow.borrowed_at }}</td>
+          <td>{{ borrow.due_date }}</td>
+          <td>{{ borrow.returned_at }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <a href="{% url 'admin:library_book_changelist' %}">Back to book list</a>
+{% endblock %}

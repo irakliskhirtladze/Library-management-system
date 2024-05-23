@@ -26,7 +26,9 @@ class LogInView(LoginView):
     template_name = 'users/login.html'
     authentication_form = AuthenticationForm
     redirect_authenticated_user = True
-    success_url = reverse_lazy('home')
+
+    def get_success_url(self):
+        return reverse_lazy('book-list')
 
 
 def log_out(request):

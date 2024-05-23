@@ -1,3 +1,4 @@
+from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Q, F
 from django.utils import timezone
@@ -9,13 +10,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import serializers
 
 from library.permissions import IsLibrarian
 from users.models import CustomUser
 from users.serializers import CustomUserSerializer
 from library.models import Author, Genre, Book, Reservation, Borrow
-from library.serializers import AuthorSerializer, GenreSerializer, BookSerializer, ReservationSerializer,\
-    BorrowSerializer
+from library.serializers import AuthorSerializer, GenreSerializer, BookSerializer, ReservationSerializer, \
+    BorrowSerializer, BorrowHistorySerializer
 
 
 class AuthorViewSet(viewsets.ModelViewSet):
@@ -88,6 +90,45 @@ class BookViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         queryset = queryset.annotate(popularity=Count('borrow'))
         return queryset
+
+    @action(detail=True, methods=['get'], permission_classes=[IsLibrarian])
+    def borrow_history(self, request, pk=None):
+        """
+        Custom action to retrieve the borrow history of a book.
+        """
+        book = self.get_object()
+        borrows = Borrow.objects.filter(book=book).select_related('user').order_by('-borrowed_at')
+        serializer = BorrowHistorySerializer(borrows, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def wish(self, request, pk=None):
+        """
+        Custom action to make a wish for an unavailable book.
+        """
+        book = self.get_object()
+        user = request.user
+
+        serializer = self.get_serializer(book)
+        try:
+            serializer.add_wish(user)
+            return Response(
+                {"detail": "Your wish has been recorded. You will be notified when the book becomes available."},
+                status=status.HTTP_200_OK)
+        except serializers.ValidationError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def remove_wish(self, request, pk=None):
+        """
+        Custom action to remove a wish for a book.
+        """
+        book = self.get_object()
+        user = request.user
+
+        serializer = self.get_serializer(book)
+        serializer.remove_wish(user)
+        return Response({"detail": "Your wish has been removed."}, status=status.HTTP_200_OK)
 
 
 class ReservationViewSet(viewsets.ModelViewSet):
@@ -220,16 +261,16 @@ class BorrowViewSet(viewsets.ModelViewSet):
         book = self.get_object()
         user = request.user
 
-        if Borrow.objects.filter(user=user, returned_at__isnull=True).exists():
-            return Response({"detail": "You cannot borrow another book while you have an active borrowing."},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        due_date = timezone.now() + timezone.timedelta(days=14)
-        borrow = Borrow.objects.create(user=user, book=book, due_date=due_date)
-        book.quantity -= 1
-        book.save()
-        serializer = self.get_serializer(borrow)
-        return Response(serializer.data)
+        try:
+            due_date = timezone.now() + timezone.timedelta(days=14)
+            borrow = Borrow.objects.create(user=user, book=book, due_date=due_date)
+            serializer = self.get_serializer(borrow)
+            return Response(serializer.data)
+        except DjangoValidationError as e:
+            if hasattr(e, 'message_dict'):
+                raise DRFValidationError(e.message_dict)
+            else:
+                raise DRFValidationError(e.messages)
 
     @action(detail=True, methods=['post'])
     def return_book(self, request, pk=None):
@@ -239,15 +280,13 @@ class BorrowViewSet(viewsets.ModelViewSet):
         borrow = self.get_object()
         borrow.returned_at = timezone.now()
         borrow.save()
-        borrow.book.quantity += 1
-        borrow.book.save()
         serializer = self.get_serializer(borrow)
         return Response(serializer.data)
 
 
 class PopularBooksView(APIView):
     """
-    API view to get the most popular books based on borrow count.
+    API view to get 10 most popular books based on borrow count.
     """
     def get(self, request):
         books = Book.objects.annotate(borrow_count=Count('borrow')).order_by('-borrow_count')[:10]
@@ -257,7 +296,7 @@ class PopularBooksView(APIView):
 
 class BorrowCountLastYearView(APIView):
     """
-    API view to get the borrow count for books in the last year.
+    API view to get the borrow count for each book in the last year.
     """
     def get(self, request):
         one_year_ago = timezone.now() - timezone.timedelta(days=365)
@@ -268,7 +307,7 @@ class BorrowCountLastYearView(APIView):
 
 class LateReturnsView(APIView):
     """
-    API view to get the list of late returned books.
+    API view to get the list of top 100 late returned books.
     """
     def get(self, request):
         late_borrows = Borrow.objects.filter(returned_at__gt=F('due_date')).order_by('-returned_at')[:100]
@@ -278,7 +317,7 @@ class LateReturnsView(APIView):
 
 class LateReturningUsersView(APIView):
     """
-    API view to get the list of users who returned books late.
+    API view to get the list of top 100 users who returned books late.
     """
     def get(self, request):
         late_returns = Borrow.objects.filter(returned_at__gt=F('due_date')).values('user').\

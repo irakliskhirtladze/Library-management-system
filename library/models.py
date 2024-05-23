@@ -1,10 +1,11 @@
 from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from library.validators import validate_no_active_borrowing, validate_no_active_reservation
+from library.validators import validate_no_active_borrowing, validate_no_active_reservation, validate_book_availability
 
 
 class Author(models.Model):
@@ -41,6 +42,7 @@ class Book(models.Model):
     """
     author = models.ForeignKey(Author, on_delete=models.CASCADE, verbose_name=_('Author'))
     genre = models.ForeignKey(Genre, on_delete=models.CASCADE, verbose_name=_('Genre'))
+    wished_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='wished_books', blank=True)
     title = models.CharField(max_length=100, verbose_name=_('Title'))
     release_year = models.IntegerField(verbose_name=_('Release Year'))
     quantity = models.IntegerField(verbose_name=_('Quantity'))
@@ -56,6 +58,32 @@ class Book(models.Model):
     @property
     def total_borrowed_count(self):
         return Borrow.objects.filter(book=self).count()
+
+    @property
+    def available_copies(self):
+        return self.quantity - (self.currently_borrowed_count + self.active_reservations_count)
+
+    @property
+    def is_available(self):
+        return self.available_copies > 0
+
+    def notify_wishers(self):
+        """Send a notification to all wishers of the book when it becomes available."""
+        if self.is_available:
+            for user in self.wished_by.all():
+                send_mail(
+                    'Book Available Notification',
+                    f'Dear {user.email},\n\n'
+                    f'The book "{self.title}" is now available. You can reserve or borrow it.\n\n'
+                    'Thank you.',
+                    'from@example.com',  # Replace with your sender email
+                    [user.email],
+                    fail_silently=False,
+                )
+            self.wished_by.clear()
+
+    def borrow_history(self):
+        return Borrow.objects.filter(book=self).select_related('user').order_by('-borrowed_at')
 
     class Meta:
         verbose_name = _('Book')
@@ -81,12 +109,17 @@ class Reservation(models.Model):
         Validate that the user does not have an unreturned borrowing before saving the reservation.
         Plus, validate that only one active reservation per user is allowed.
         """
+        validate_book_availability(self.book)
         validate_no_active_borrowing(self.user, ignore_instance=self)
         validate_no_active_reservation(self.user, ignore_instance=self)
 
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
         self.clean()
         super().save(*args, **kwargs)
+        # Notify the book's wishers (if they exist) when reservation is canceled
+        if not self.is_active and not is_new:
+            self.book.notify_wishers()
 
     class Meta:
         verbose_name = _('Reservation')
@@ -111,6 +144,7 @@ class Borrow(models.Model):
         Validate that the user does not have another active borrowing or an active reservation for a different book.
         """
         if self.returned_at is None:
+            validate_book_availability(self.book)
             validate_no_active_borrowing(self.user, ignore_instance=self)
 
             # Check if the user has an active reservation for a different book
@@ -120,8 +154,12 @@ class Borrow(models.Model):
 
     def save(self, *args, **kwargs):
         """Cancel the reservation if the user borrows the reserved book."""
+        is_new = self.pk is None
         self.clean()
         super().save(*args, **kwargs)
+        # Notify the book's wishers (if they exist) when borrowed book is returned
+        if self.returned_at and not is_new:
+            self.book.notify_wishers()
         Reservation.objects.filter(user=self.user, book=self.book, is_active=True).update(is_active=False)
 
     class Meta:

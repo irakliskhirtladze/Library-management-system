@@ -1,5 +1,8 @@
 from django.contrib import admin
 from django import forms
+from django.shortcuts import render
+from django.utils.html import format_html
+from django.urls import reverse, path
 
 from library.models import Author, Genre, Book, Reservation, Borrow
 
@@ -28,7 +31,7 @@ class BorrowAdminForm(forms.ModelForm):
 
 class BookAdmin(admin.ModelAdmin):
     list_display = ['title', 'author', 'genre', 'release_year', 'quantity', 'currently_borrowed_count',
-                    'active_reservations_count', 'total_borrowed_count']
+                    'active_reservations_count', 'total_borrowed_count', 'borrow_history_link']
     readonly_fields = ('currently_borrowed_count', 'active_reservations_count', 'total_borrowed_count')
     fieldsets = (
         (None, {
@@ -41,6 +44,39 @@ class BookAdmin(admin.ModelAdmin):
     search_fields = ['title', 'author__full_name', 'genre__name']
     list_filter = ['genre', 'author']
     ordering = ['title']
+
+    def borrow_history_link(self, obj):
+        """
+        Returns a link to the borrow history for the given book.
+        """
+        url = reverse('admin:borrow_history', args=[obj.pk])
+        return format_html('<a href="{}">View History</a>', url)
+
+    borrow_history_link.short_description = 'Borrow History'
+
+    def get_urls(self):
+        """
+        Add custom URL for borrow history view.
+        """
+        urls = super().get_urls()
+        custom_urls = [
+            path('borrow-history/<int:book_id>/', self.admin_site.admin_view(self.borrow_history_view),
+                 name='borrow_history'),
+        ]
+        return custom_urls + urls
+
+    def borrow_history_view(self, request, book_id):
+        """
+        Custom view to display the borrow history of a book.
+        """
+        book = Book.objects.get(pk=book_id)
+        borrows = book.borrow_history()
+        context = dict(
+            self.admin_site.each_context(request),
+            book=book,
+            borrows=borrows,
+        )
+        return render(request, 'admin/borrow_history.html', context)
 
 
 class ReservationAdmin(admin.ModelAdmin):

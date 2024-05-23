@@ -11,10 +11,10 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
@@ -27,7 +27,6 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -37,6 +36,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    'django_celery_beat',  # New
 
     'rest_framework',  # New
     'django_filters',  # New
@@ -75,7 +76,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Library_management_project.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
@@ -85,7 +85,6 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
@@ -105,7 +104,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
@@ -116,7 +114,6 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
@@ -129,12 +126,10 @@ STATICFILES_DIRS = [BASE_DIR / 'static']  # New
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
 AUTH_USER_MODEL = 'users.CustomUser'  # New
 
-LOGIN_REDIRECT_URL = "home"  # new
+LOGIN_REDIRECT_URL = "book-list"  # new
 LOGOUT_REDIRECT_URL = "home"  # new
-
 
 REST_FRAMEWORK = {  # New
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -155,13 +150,28 @@ REST_FRAMEWORK = {  # New
     'PAGE_SIZE': 5,
 }
 
-# New code for sending emails
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.example.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'your-email@example.com'
-EMAIL_HOST_PASSWORD = 'your-email-password'
-
+#  New code for celery automation
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
+CELERY_BEAT_SCHEDULE = {
+    'cancel-expired-reservations-every-hour': {
+        'task': 'library.tasks.cancel_expired_reservations',
+        'schedule': crontab(minute=0, hour='*'),  # Every hour
+    },
+    'send-reminder-emails-every-day': {
+        'task': 'library.tasks.send_reminder_emails',
+        'schedule': crontab(hour=0, minute=0),  # Every day at midnight
+    },
+}
+
+# New code for sending emails
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For development
+
+# For production, we probably would use something like this:
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.example.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'someone@email.com'
+# EMAIL_HOST_PASSWORD = 'email-password'

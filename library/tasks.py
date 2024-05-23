@@ -9,9 +9,9 @@ from django.utils import timezone
 @shared_task
 def cancel_expired_reservations():
     now = timezone.now()
-    expired_reservations = Reservation.objects.filter(expires_at__lte=now)
-    for reservation in expired_reservations:
-        reservation.delete()
+    expired_reservations = Reservation.objects.filter(expires_at__lte=now, is_active=True)
+    count = expired_reservations.update(is_active=False)
+    return count
 
 
 @shared_task

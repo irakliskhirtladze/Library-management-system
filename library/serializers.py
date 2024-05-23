@@ -27,17 +27,47 @@ class GenreSerializer(serializers.ModelSerializer):
         fields = ['id', 'name']
 
 
+class BorrowHistorySerializer(serializers.ModelSerializer):
+    """
+    Serializer for Borrow history.
+    """
+    user = serializers.StringRelatedField()
+
+    class Meta:
+        model = Borrow
+        fields = ['user', 'borrowed_at', 'returned_at']
+
+
 class BookSerializer(serializers.ModelSerializer):
     """
     Serializer for Book model.
     """
     author = AuthorSerializer()
     genre = GenreSerializer()
+    borrow_history = BorrowHistorySerializer(source='borrow_set', many=True, read_only=True)
 
     class Meta:
         model = Book
         fields = ['id', 'title', 'author', 'genre', 'release_year', 'quantity', 'currently_borrowed_count',
-                  'active_reservations_count', 'total_borrowed_count']
+                  'active_reservations_count', 'total_borrowed_count', 'borrow_history']
+
+    def add_wish(self, user):
+        """
+        Add a wish for the book.
+        """
+        if self.instance.is_available:
+            raise serializers.ValidationError("This book is currently available and cannot be wished for.")
+        self.instance.wished_by.add(user)
+        self.instance.save()
+        return self.instance
+
+    def remove_wish(self, user):
+        """
+        Remove a wish for the book.
+        """
+        self.instance.wished_by.remove(user)
+        self.instance.save()
+        return self.instance
 
 
 class ReservationSerializer(serializers.ModelSerializer):

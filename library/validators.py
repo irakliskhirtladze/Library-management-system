@@ -23,3 +23,9 @@ def validate_no_active_borrowing(user, ignore_instance=None):
         active_borrowings = active_borrowings.exclude(pk=ignore_instance.pk)
     if active_borrowings.exists():
         raise ValidationError("This user already has an active borrowing.")
+
+
+def validate_book_availability(book):
+    """Validates that the book is available for borrowing or reservation"""
+    if not book.is_available:
+        raise ValidationError("This book is currently unavailable.")
