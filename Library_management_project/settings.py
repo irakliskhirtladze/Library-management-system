@@ -126,12 +126,6 @@ STATICFILES_DIRS = [BASE_DIR / 'static']  # New
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',
-]
-
-
 AUTH_USER_MODEL = 'users.CustomUser'  # New
 
 LOGIN_REDIRECT_URL = "book-list"  # new

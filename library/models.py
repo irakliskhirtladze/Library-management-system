@@ -67,13 +67,24 @@ class Book(models.Model):
     def is_available(self):
         return self.available_copies > 0
 
+    @property
+    def borrow_count_last_year(self):
+        """
+        Calculate the borrow count for the book in the past year.
+        """
+        one_year_ago = timezone.now() - timezone.timedelta(days=365)
+        return Borrow.objects.filter(book=self, borrowed_at__gte=one_year_ago).count()
+
+    def borrow_history(self):
+        return Borrow.objects.filter(book=self).select_related('user').order_by('-borrowed_at')
+
     def notify_wishers(self):
         """Send a notification to all wishers of the book when it becomes available."""
         if self.is_available:
             for user in self.wished_by.all():
                 send_mail(
                     'Book Available Notification',
-                    f'Dear {user.email},\n\n'
+                    f'Dear {user.email}, \n\n'
                     f'The book "{self.title}" is now available. You can reserve or borrow it.\n\n'
                     'Thank you.',
                     'from@example.com',  # Replace with your sender email
@@ -81,9 +92,6 @@ class Book(models.Model):
                     fail_silently=False,
                 )
             self.wished_by.clear()
-
-    def borrow_history(self):
-        return Borrow.objects.filter(book=self).select_related('user').order_by('-borrowed_at')
 
     class Meta:
         verbose_name = _('Book')
@@ -117,7 +125,7 @@ class Reservation(models.Model):
         is_new = self.pk is None
         self.clean()
         super().save(*args, **kwargs)
-        # Notify the book's wishers (if they exist) when reservation is canceled
+        # Notify the book's wishers (if they exist) when reservation is canceled or expired
         if not self.is_active and not is_new:
             self.book.notify_wishers()
 

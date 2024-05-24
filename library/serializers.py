@@ -9,6 +9,12 @@ from library.validators import validate_no_active_borrowing, validate_no_active_
 User = get_user_model()
 
 
+class CustomUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'email']
+
+
 class AuthorSerializer(serializers.ModelSerializer):
     """
     Serializer for Author model.
@@ -25,17 +31,6 @@ class GenreSerializer(serializers.ModelSerializer):
     class Meta:
         model = Genre
         fields = ['id', 'name']
-
-
-class BorrowHistorySerializer(serializers.ModelSerializer):
-    """
-    Serializer for Borrow history.
-    """
-    user = serializers.StringRelatedField()
-
-    class Meta:
-        model = Borrow
-        fields = ['user', 'borrowed_at', 'returned_at']
 
 
 class BookListSerializer(serializers.ModelSerializer):
@@ -60,25 +55,7 @@ class BookSerializer(serializers.ModelSerializer):
     class Meta:
         model = Book
         fields = ['id', 'title', 'author', 'genre', 'release_year', 'quantity', 'currently_borrowed_count',
-                  'active_reservations_count', 'total_borrowed_count']
-
-    def add_wish(self, user):
-        """
-        Add a wish for the book.
-        """
-        if self.instance.is_available:
-            raise serializers.ValidationError("This book is currently available and cannot be wished for.")
-        self.instance.wished_by.add(user)
-        self.instance.save()
-        return self.instance
-
-    def remove_wish(self, user):
-        """
-        Remove a wish for the book.
-        """
-        self.instance.wished_by.remove(user)
-        self.instance.save()
-        return self.instance
+                  'active_reservations_count', 'total_borrowed_count', 'borrow_count_last_year']
 
 
 class ReservationSerializer(serializers.ModelSerializer):
@@ -88,3 +65,19 @@ class ReservationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Reservation
         fields = ['id']
+
+
+class BorrowSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Borrow model
+    """
+    user = serializers.StringRelatedField()
+
+    class Meta:
+        model = Borrow
+        fields = ['user', 'borrowed_at', 'returned_at']
+
+
+class EmptySerializer(serializers.Serializer):
+    """Empty serializer to be used for wish endpoints"""
+    pass
