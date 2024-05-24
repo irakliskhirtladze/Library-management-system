@@ -38,18 +38,29 @@ class BorrowHistorySerializer(serializers.ModelSerializer):
         fields = ['user', 'borrowed_at', 'returned_at']
 
 
+class BookListSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Book model.
+    """
+    author = AuthorSerializer()
+    genre = GenreSerializer()
+
+    class Meta:
+        model = Book
+        fields = ['id', 'title', 'author', 'genre', 'release_year']
+
+
 class BookSerializer(serializers.ModelSerializer):
     """
     Serializer for Book model.
     """
     author = AuthorSerializer()
     genre = GenreSerializer()
-    borrow_history = BorrowHistorySerializer(source='borrow_set', many=True, read_only=True)
 
     class Meta:
         model = Book
         fields = ['id', 'title', 'author', 'genre', 'release_year', 'quantity', 'currently_borrowed_count',
-                  'active_reservations_count', 'total_borrowed_count', 'borrow_history']
+                  'active_reservations_count', 'total_borrowed_count']
 
     def add_wish(self, user):
         """
@@ -72,47 +83,8 @@ class BookSerializer(serializers.ModelSerializer):
 
 class ReservationSerializer(serializers.ModelSerializer):
     """
-    Serializer for Reservation model.
-    Ensures that only one active reservation per user is allowed.
+    Serializer for Reservation model. Only book field is required.
     """
-    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), default=serializers.CurrentUserDefault())
-    book = serializers.PrimaryKeyRelatedField(queryset=Book.objects.all())
-
     class Meta:
         model = Reservation
-        fields = ['id', 'user', 'book', 'reserved_at', 'expires_at']
-
-    def __init__(self, *args, **kwargs):
-        """
-        Set default user to the user field for non-staff users and remove this field from the serializer input.
-        Plus, remove the expires_at field from the serializer input.
-        """
-        super().__init__(*args, **kwargs)
-        request = self.context.get('request', None)
-        if request and not request.user.is_staff:
-            self.fields['user'].read_only = True
-            self.fields['user'].default = request.user
-            self.fields.pop('user')
-
-        self.fields.pop('expires_at')
-
-
-class BorrowSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Borrow model.
-    Ensures that only one active borrowing per user is allowed.
-    """
-    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
-    book = serializers.PrimaryKeyRelatedField(queryset=Book.objects.all())
-    due_date = serializers.DateTimeField(default=timezone.now() + timezone.timedelta(days=14))
-
-    class Meta:
-        model = Borrow
-        fields = ['id', 'user', 'book', 'borrowed_at', 'due_date', 'returned_at']
-
-    def __init__(self, *args, **kwargs):
-        """
-        Remove the due_date field from the serializer input
-        """
-        super().__init__(*args, **kwargs)
-        self.fields.pop('due_date')
+        fields = ['id']

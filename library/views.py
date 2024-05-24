@@ -5,8 +5,6 @@ from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import viewsets, status, permissions, filters
-from rest_framework.exceptions import ValidationError as DRFValidationError
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -17,7 +15,7 @@ from users.models import CustomUser
 from users.serializers import CustomUserSerializer
 from library.models import Author, Genre, Book, Reservation, Borrow
 from library.serializers import AuthorSerializer, GenreSerializer, BookSerializer, ReservationSerializer, \
-    BorrowSerializer, BorrowHistorySerializer
+    BorrowHistorySerializer, BookListSerializer
 
 
 class AuthorViewSet(viewsets.ModelViewSet):
@@ -30,11 +28,10 @@ class AuthorViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """
         Assign permissions based on action.
-        Only admin users can list or retrieve authors.
         Only admin users can create, update, or delete authors.
         """
         if self.action in ['list', 'retrieve']:
-            permission_classes = [permissions.IsAdminUser]
+            permission_classes = [permissions.IsAuthenticated]
         else:
             permission_classes = [IsLibrarian]
         return [permission() for permission in permission_classes]
@@ -50,11 +47,10 @@ class GenreViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """
         Assign permissions based on action.
-        Only admin users can list or retrieve genres.
         Only admin users can create, update, or delete genres.
         """
         if self.action in ['list', 'retrieve']:
-            permission_classes = [permissions.IsAdminUser]
+            permission_classes = [permissions.IsAuthenticated]
         else:
             permission_classes = [IsLibrarian]
         return [permission() for permission in permission_classes]
@@ -62,22 +58,20 @@ class GenreViewSet(viewsets.ModelViewSet):
 
 class BookViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing books.
+    ViewSet for managing books, reservations and wishes for unavailable books.
     """
     queryset = Book.objects.all()
-    serializer_class = BookSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['author', 'genre']
     search_fields = ['title', 'author__full_name', 'genre__name']
-    ordering_fields = ['title', 'release_year', 'popularity']
+    ordering_fields = ['id', 'popularity']
 
     def get_permissions(self):
         """
         Assign permissions based on action.
-        All authenticated users can list or retrieve books.
-        Only admin users can create, update, or delete books.
         """
-        if self.action in ['list', 'retrieve']:
+        print(f"Action: {self.action}, Method: {self.request.method}, User: {self.request.user}")  # Enhanced Debugging
+        if self.action in ['list', 'retrieve', 'wish', 'remove_wish', 'reserve', 'cancel_reservation']:
             permission_classes = [permissions.IsAuthenticated]
         else:
             permission_classes = [IsLibrarian]
@@ -90,6 +84,16 @@ class BookViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         queryset = queryset.annotate(popularity=Count('borrow'))
         return queryset
+
+    def get_serializer_class(self):
+        """
+        Return the appropriate serializer class based on the action.
+        """
+        if self.action == 'list':
+            return BookListSerializer
+        elif self.action in ['reserve', 'cancel_reservation']:
+            return ReservationSerializer
+        return BookSerializer
 
     @action(detail=True, methods=['get'], permission_classes=[IsLibrarian])
     def borrow_history(self, request, pk=None):
@@ -130,158 +134,37 @@ class BookViewSet(viewsets.ModelViewSet):
         serializer.remove_wish(user)
         return Response({"detail": "Your wish has been removed."}, status=status.HTTP_200_OK)
 
-
-class ReservationViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing reservations.
-    """
-    queryset = Reservation.objects.all()
-    serializer_class = ReservationSerializer
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['user__email', 'book__title']
-
-    def get_permissions(self):
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def reserve(self, request, pk=None):
         """
-        Assign permissions based on action.
-        All authenticated users can create or cancel reservations.
-        Only admins can create, update, partially update, or delete reservations for other users.
-        """
-        if self.action in ['create', 'cancel']:
-            permission_classes = [IsAuthenticated]
-        elif self.action in ['update', 'partial_update', 'destroy']:
-            permission_classes = [IsLibrarian]
-        else:
-            permission_classes = [IsAuthenticated]
-        return [permission() for permission in permission_classes]
-
-    def get_queryset(self):
-        """
-        Customize the queryset to filter based on the user.
-        """
-        user = self.request.user
-        if user.is_staff:
-            return Reservation.objects.all()
-        else:
-            return Reservation.objects.filter(user=user, is_active=True)
-
-    def perform_create(self, serializer):
-        """
-        Save the reservation instance, ensuring the user is correctly chosen if librarian is making the reservation.
-        """
-        if not self.request.user.is_staff:
-            serializer.save(user=self.request.user)
-        else:
-            serializer.save()
-
-    def create(self, request, *args, **kwargs):
-        """
-        Override the create method to handle validation errors and return them as API responses.
-        """
-        try:
-            return super().create(request, *args, **kwargs)
-        # Check if it's a ValidationError and has a message_dict attribute
-        except DjangoValidationError as e:
-            if hasattr(e, 'message_dict'):
-                raise DRFValidationError(e.message_dict)
-            else:
-                raise DRFValidationError(e.messages)
-
-    @action(detail=True, methods=['post'])
-    def cancel(self, request, pk=None):
-        """
-        Custom action to cancel a reservation.
-        """
-        reservation = self.get_object()
-        if reservation.user != request.user and not request.user.is_staff:
-            return Response({"detail": "You do not have permission to cancel this reservation."},
-                            status=status.HTTP_403_FORBIDDEN)
-        reservation.is_active = False
-        reservation.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class BorrowViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing borrowings.
-    """
-    queryset = Borrow.objects.all()
-    serializer_class = BorrowSerializer
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['user__email', 'book__title']
-
-    def get_permissions(self):
-        """
-        Assign permissions based on action.
-        All authenticated users can list or retrieve borrowings.
-        Only admins can create, update, partially update, or delete borrowings.
-        """
-        if self.action in ['create', 'update', 'partial_update', 'destroy', 'return_book']:
-            permission_classes = [IsLibrarian]
-        else:
-            permission_classes = [permissions.IsAuthenticated]
-        return [permission() for permission in permission_classes]
-
-    def get_queryset(self):
-        """
-        Customize the queryset to filter based on the user.
-        """
-        user = self.request.user
-        if user.is_staff:
-            return Borrow.objects.all()
-        else:
-            return Borrow.objects.filter(user=user, returned_at__isnull=True)
-
-    def perform_create(self, serializer):
-        """
-        Save the borrowing instance, ensuring the user field is correctly set.
-        """
-        if not self.request.user.is_staff:
-            serializer.save(user=self.request.user)
-        else:
-            serializer.save()
-
-    def create(self, request, *args, **kwargs):
-        """
-        Override the create method to handle validation errors and return them as API responses.
-        """
-        try:
-            return super().create(request, *args, **kwargs)
-        except DjangoValidationError as e:
-            # Check if it's a ValidationError and has a message_dict attribute
-            if hasattr(e, 'message_dict'):
-                raise DRFValidationError(e.message_dict)
-            else:
-                raise DRFValidationError(e.messages)
-
-    @action(detail=True, methods=['post'])
-    def borrow(self, request, pk=None):
-        """
-        Custom action to borrow a book.
+        Custom action to reserve a book.
         """
         book = self.get_object()
         user = request.user
 
         try:
-            due_date = timezone.now() + timezone.timedelta(days=14)
-            borrow = Borrow.objects.create(user=user, book=book, due_date=due_date)
-            serializer = self.get_serializer(borrow)
-            return Response(serializer.data)
+            reservation = Reservation.objects.create(user=user, book=book)
+            serializer = ReservationSerializer(reservation)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         except DjangoValidationError as e:
+            # Handle both message_dict and messages attributes
             if hasattr(e, 'message_dict'):
-                raise DRFValidationError(e.message_dict)
+                return Response({"detail": e.message_dict}, status=status.HTTP_400_BAD_REQUEST)
             else:
-                raise DRFValidationError(e.messages)
+                return Response({"detail": e.messages}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post'])
-    def return_book(self, request, pk=None):
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def cancel_reservation(self, request, pk=None):
         """
-        Custom action to return a book.
+        Custom action to cancel a reservation for a book.
         """
-        borrow = self.get_object()
-        borrow.returned_at = timezone.now()
-        borrow.save()
-        serializer = self.get_serializer(borrow)
-        return Response(serializer.data)
+        try:
+            reservation = Reservation.objects.get(book_id=pk, user=request.user, is_active=True)
+            reservation.is_active = False
+            reservation.save()
+            return Response({"detail": "Reservation canceled successfully."}, status=status.HTTP_200_OK)
+        except Reservation.DoesNotExist:
+            return Response({"detail": "Active reservation not found for this book."}, status=status.HTTP_404_NOT_FOUND)
 
 
 class PopularBooksView(APIView):

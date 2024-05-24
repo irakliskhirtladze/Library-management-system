@@ -1,14 +1,14 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
-from library.views import AuthorViewSet, GenreViewSet, BookViewSet, ReservationViewSet, BorrowViewSet, \
+from library.views import AuthorViewSet, GenreViewSet, BookViewSet,\
     PopularBooksView, BorrowCountLastYearView, LateReturnsView, LateReturningUsersView
 
 router = DefaultRouter()
 router.register(r'authors', AuthorViewSet, basename='author')
 router.register(r'genres', GenreViewSet, basename='genre')
 router.register(r'books', BookViewSet, basename='book')
-router.register(r'reservations', ReservationViewSet, basename='reservation')
-router.register(r'borrows', BorrowViewSet, basename='borrow')
+# router.register(r'reservations', ReservationViewSet, basename='reservation')
+# router.register(r'borrows', BorrowViewSet, basename='borrow')
 
 urlpatterns = router.urls
 
