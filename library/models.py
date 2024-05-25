@@ -87,7 +87,7 @@ class Book(models.Model):
                     f'Dear {user.email}, \n\n'
                     f'The book "{self.title}" is now available. You can reserve or borrow it.\n\n'
                     'Thank you.',
-                    'from@example.com',  # Replace with your sender email
+                    settings.DEFAULT_FROM_EMAIL,
                     [user.email],
                     fail_silently=False,
                 )

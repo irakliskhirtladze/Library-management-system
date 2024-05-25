@@ -5,11 +5,13 @@
 
 <!--Homepage content if user is NOT logged in-->
 {% if not user.is_authenticated %}
+<div class="container">
     <p>Please log in to use our library</p>
     <br><br>
     <p><a href="{% url 'login' %}">Log In</a></p>
     <br>
     <p><a href="{% url 'signup' %}">Sign Up</a></p>
+</div>
 {% endif %}
 
 

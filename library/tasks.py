@@ -21,7 +21,8 @@ def send_overdue_notifications():
     for borrow in overdue_borrows:
         send_mail(
             'Overdue Book Notification',
-            f'Dear {borrow.user.first_name}, the book "{borrow.book.title}" you borrowed is overdue. Please return it as soon as possible.',
+            f'Dear {borrow.user.first_name}, the book "{borrow.book.title}" you borrowed is overdue. Please return it '
+            f'as soon as possible.',
             settings.DEFAULT_FROM_EMAIL,
             [borrow.user.email],
         )

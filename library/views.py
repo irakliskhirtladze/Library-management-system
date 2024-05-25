@@ -201,13 +201,3 @@ class StatisticsViewSet(viewsets.ViewSet):
         users = CustomUser.objects.filter(id__in=user_ids)
         serializer = CustomUserSerializer(users, many=True)
         return Response(serializer.data)
-
-    # @action(detail=False, methods=['get'])
-    # def borrow_count_last_year(self, request):
-    #     """
-    #     Custom action to get the borrow count for each book in the last year.
-    #     """
-    #     one_year_ago = timezone.now() - timezone.timedelta(days=365)
-    #     books = Book.objects.annotate(borrow_count=Count('borrow', filter=Q(borrow__borrowed_at__gte=one_year_ago)))
-    #     serializer = BookSerializer(books, many=True)
-    #     return Response(serializer.data)
