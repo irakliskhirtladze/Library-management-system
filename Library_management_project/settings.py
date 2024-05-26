@@ -42,9 +42,9 @@ INSTALLED_APPS = [
 
     'rest_framework',  # New
     'django_filters',  # New
-    'start',  # New
     'users',  # New
     'library',  # New
+    'web',  # New
 ]
 
 MIDDLEWARE = [
@@ -129,7 +129,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'users.CustomUser'  # New
 
-LOGIN_REDIRECT_URL = "book-list"  # new
+LOGIN_URL = 'login'  # new
+LOGIN_REDIRECT_URL = "home"  # new
 LOGOUT_REDIRECT_URL = "home"  # new
 
 REST_FRAMEWORK = {  # New
@@ -149,6 +150,9 @@ REST_FRAMEWORK = {  # New
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 5,
 }
+
+API_URL = 'http://127.0.0.1:8000/api'  # New
+
 
 #  New code for celery automation
 CELERY_BROKER_URL = 'redis://localhost:6379/0'

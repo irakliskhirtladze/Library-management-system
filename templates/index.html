@@ -1,19 +1,19 @@
 <!-- templates/index.html -->
 {% extends "base.html" %}
-{% block title %}Start page{% endblock title %}
+{% load custom_tags %}
+{% block title %}Home{% endblock title %}
 {% block content %}
 
 <!--Homepage content if user is NOT logged in-->
 {% if not user.is_authenticated %}
-<div class="container">
-    <p>Please log in to use our library</p>
-    <br><br>
-    <p><a href="{% url 'login' %}">Log In</a></p>
-    <br>
-    <p><a href="{% url 'signup' %}">Sign Up</a></p>
-</div>
+    <div class="header">
+        <h3>Please log in to access library</h3>
+        <br>
+        <p><a href="{% url 'login' %}">Log In</a></p>
+        <p>or</p>
+        <p><a href="{% url 'signup' %}">Sign Up</a></p>
+    </div>
 {% endif %}
-
 
 <!--Homepage content if user is logged in-->
 {% if user.is_authenticated %}
@@ -21,9 +21,71 @@
     <br><br>
     <p><a href="{% url 'logout' %}">Log Out</a></p>
     <br>
-<!--    Display content here-->
+
+    <div class="container">
+        <h2>Book List</h2>
+
+        <!-- Filter form -->
+        <form method="get" action="{% url 'home' %}" style="display: inline-block; margin-right: 20px;">
+            <input type="text" name="search" placeholder="Search..." value="{{ search }}">
+            <select name="author">
+                <option value="">All Authors</option>
+                {% for a in authors %}
+                    <option value="{{ a.0 }}" {% if author == a.0|stringformat:"s" %}selected{% endif %}>{{ a.1 }}</option>
+                {% endfor %}
+            </select>
+            <select name="genre">
+                <option value="">All Genres</option>
+                {% for g in genres %}
+                    <option value="{{ g.0 }}" {% if genre == g.0|stringformat:"s" %}selected{% endif %}>{{ g.1 }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Filter</button>
+        </form>
+
+        <ul>
+            {% for book in books %}
+                <li>
+                    <a href="{% url 'book_detail' book.id %}">{{ book.title }}</a> by {{ book.author.full_name }} ({{ book.genre.name }})
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <!-- Pagination -->
+   <div class="pagination">
+        {% if pagination.page > 1 %}
+            <a href="?page=1">First</a>
+
+        {% else %}
+            <span class="disabled">First</span>
+        {% endif %}
+
+        {% if pagination.page > 2 %}
+            <span>...</span>
+        {% endif %}
+
+        {% if pagination.page > 1 %}
+            <a href="?page={{ pagination.page|add:-1 }}">{{ pagination.page|add:-1 }}</a>
+        {% endif %}
+
+        <span class="current">{{ pagination.page }}</span>
+
+        {% if pagination.page < pagination.total_pages %}
+            <a href="?page={{ pagination.page|add:1 }}">{{ pagination.page|add:1 }}</a>
+        {% endif %}
+
+        {% if pagination.page < pagination.total_pages|add:-1 %}
+            <span>...</span>
+        {% endif %}
+
+        {% if pagination.page < pagination.total_pages %}
+            <a href="?page={{ pagination.total_pages }}">Last</a>
+        {% else %}
+            <span class="disabled">Last</span>
+        {% endif %}
+    </div>
+
 {% endif %}
-
-
 
 {% endblock content %}

@@ -67,10 +67,9 @@ Finally go to http://127.0.0.1:8000/ or http://127.0.0.1:8000/admin to start usi
 
 
 ## Task automation
-To automate tasks for periodic execution, launch separate terminals and run the following commands, one in each:
-```
-redis-server
-```
+If you want to also automate tasks for periodic execution, launch redis, 
+and then in separate terminals run the following commands, one in each:
+
 ```
 celery -A Library_management_project worker --loglevel=info
 ```

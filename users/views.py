@@ -5,7 +5,7 @@ from django.urls import reverse_lazy
 from django.views.generic import CreateView
 from django.contrib.auth import get_user_model
 
-from .forms import CustomUserCreationForm
+from users.forms import CustomUserCreationForm
 from django.contrib.auth import logout
 
 CustomUser = get_user_model()
@@ -28,7 +28,7 @@ class LogInView(LoginView):
     redirect_authenticated_user = True
 
     def get_success_url(self):
-        return reverse_lazy('book-list')
+        return reverse_lazy('home')
 
 
 def log_out(request):
