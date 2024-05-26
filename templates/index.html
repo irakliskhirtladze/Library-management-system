@@ -40,9 +40,12 @@
                     <option value="{{ g.0 }}" {% if genre == g.0|stringformat:"s" %}selected{% endif %}>{{ g.1 }}</option>
                 {% endfor %}
             </select>
+            <br><br>
             <button type="submit">Filter</button>
         </form>
 
+        <br><br>
+        <!-- Book list -->
         <ul>
             {% for book in books %}
                 <li>

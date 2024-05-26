@@ -1,33 +1,37 @@
 # Library manager system
 
 ## Description
-Library management system is build with Django and Rest framework. It intends to manage a physical library and 
+Library management system is built with Django and Rest framework. It's intended to manage a book library and 
 allow users to register, view, reserve and make a wish for currently unavailable books.
 
-Librarians can use admin panel, and to some extent API view to manage books, genres, authors and see library statistics.
+Librarians can use admin panel, and to some extent API to manage books, genres, authors and see library statistics.
 
 ## Project Structure
 Project has 2 main apps: users and library. There's also Third app called start, which is just used to render some
 homepage templates and make it a bit easier to navigate.
 
 ### Users app
-This app is used to define a custom user model that makes sense for this project.
+This app is used to define a custom user model and allow registration/login for users.
 
-User registration/login endpoints use template rendering.
 
 ### Library app
-This app built with Rest framework and is based on few key models: Genre, Author, Book, Reservation and Borrow models.
+This app is built with Rest framework, and it's based on few key models: Genre, Author, Book, Reservation and Borrow
+models.
 
 Genre and Author are very simple models related to Book model.
 
 Book model has more complicated structure, with several dynamic fields and methods.
 Same is true for Reservation and Borrow models.
 
+### Web app
+This app allows limited frontend capabilities with template rendering. Uses only HTML and CSS to do so.
+
 ### Business logic
 The business logic is centered (at least I tried) around models to allow robustness and reduce code duplication.
 
 For example: A user cannot reserve a book if that user has another active reservation, has unreturned borrowing 
-or the book is unavailable. Instead of validating this logic separately for API view and for admin panel, I included the validation in model class.
+or the book is unavailable. Instead of validating this logic separately for API view and for admin panel,
+I included the validation in model class.
 This allows a single validation which can be used in several places.
 
 Other rules include:

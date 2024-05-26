@@ -57,14 +57,14 @@ def home(request):
         authors_data = fetch_all_pages(session, f"{settings.API_URL}/library/authors/", {'X-CSRFToken': csrf_token})
         authors = [(author['id'], author['full_name']) for author in authors_data]
     except Exception as e:
-        print(f"Error fetching authors: {e}")
+        pass
 
     try:
         # Fetch genres from API and format as (id, name) tuples
         genres_data = fetch_all_pages(session, f"{settings.API_URL}/library/genres/", {'X-CSRFToken': csrf_token})
         genres = [(genre['id'], genre['name']) for genre in genres_data]
     except Exception as e:
-        print(f"Error fetching genres: {e}")
+        pass
 
     context = {
         'books': books,
@@ -96,7 +96,6 @@ def book_detail(request, pk):
                 return redirect('book_detail', pk=pk)
             else:
                 error_message = response.json().get('detail', 'Reservation failed.')
-                print(f"Reservation Error: {error_message}")
 
         elif 'cancel_reservation' in request.POST:
             cancel_reservation_api_url = f"{api_url}cancel_reservation/"
@@ -105,7 +104,6 @@ def book_detail(request, pk):
                 return redirect('book_detail', pk=pk)
             else:
                 error_message = response.json().get('detail', 'Canceling reservation failed.')
-                print(f"Cancel Reservation Error: {error_message}")
 
         elif 'wish' in request.POST:
             wish_api_url = f"{api_url}wish/"
@@ -114,7 +112,6 @@ def book_detail(request, pk):
                 return redirect('book_detail', pk=pk)
             else:
                 error_message = response.json().get('detail', 'Wish creation failed.')
-                print(f"Wish Error: {error_message}")
 
         elif 'remove_wish' in request.POST:
             remove_wish_api_url = f"{api_url}remove_wish/"
@@ -123,7 +120,6 @@ def book_detail(request, pk):
                 return redirect('book_detail', pk=pk)
             else:
                 error_message = response.json().get('detail', 'Removing wish failed.')
-                print(f"Remove Wish Error: {error_message}")
 
     response = session.get(api_url, headers={'X-CSRFToken': csrf_token})
     user_status_response = session.get(user_status_url, headers={'X-CSRFToken': csrf_token})
