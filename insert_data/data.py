@@ -3,6 +3,11 @@ import random
 import re
 import os
 import django
+import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
+from Library_management_project.settings import BASE_DIR
 from library.models import Author, Genre, Book
 
 # Ensure the settings module is set up correctly
@@ -18,7 +23,8 @@ def clean_data(data):
 
 def add_random_authors():
     try:
-        with open("authors.txt", "r") as f:
+        authors_file = os.path.join(BASE_DIR, "insert_data", "authors.txt")
+        with open(authors_file, "r") as f:
             authors = f.read().splitlines()
         for author in authors:
             author = clean_data(author)
@@ -29,7 +35,8 @@ def add_random_authors():
 
 def add_genres():
     try:
-        with open("genres.txt", "r") as f:
+        genres_file = os.path.join(BASE_DIR, "insert_data", "genres.txt")
+        with open(genres_file, "r") as f:
             genres = f.read().splitlines()
         for genre in genres:
             genre = clean_data(genre)
@@ -45,6 +52,12 @@ def scrape_books():
                 pg in range(1, 12)]
 
         dfs = []  # Stores pandas dataframes from different webpages
+        session = requests.Session()
+        retry = Retry(connect=3, backoff_factor=0.5)
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount('http://', adapter)
+        session.mount('https://', adapter)
+
         # Iterate over URLs and scrape books from them using pandas
         for url in urls:
             df = pd.read_html(url)[0]

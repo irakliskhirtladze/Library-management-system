@@ -50,6 +50,16 @@ git clone https://github.com/irakliskhirtladze/Library-management-system.git
 ```
 pip install -r requirements.txt
 ```
+3. In project root directory (where manage.py file lives) create .env file. Write these lines in this file:
+```
+EMAIL_HOST_USER=your_email@example.com
+EMAIL_HOST_PASSWORD=your_email_password
+EMAIL_HOST=smtp.example.com
+EMAIL_PORT=587
+```
+If you already have actual email setup for app testing, then replace placeholder values in .env file. Otherwise, leave it
+as shown above.
+
 3. Apply migrations:
 ```
 python manage.py migrate
