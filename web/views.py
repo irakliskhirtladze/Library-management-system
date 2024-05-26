@@ -81,11 +81,10 @@ def home(request):
 @login_required
 def book_detail(request, pk):
     api_url = f"{settings.API_URL}/library/books/{pk}/"
+    user_status_url = f"{settings.API_URL}/library/user_book_status/{pk}/"
 
     # Create a session object to maintain the authentication session
     session = requests.Session()
-
-    # Get the session cookies and CSRF token from the current request
     session.cookies.update(request.COOKIES)
     csrf_token = get_token(request)
 
@@ -99,7 +98,7 @@ def book_detail(request, pk):
                 error_message = response.json().get('detail', 'Reservation failed.')
                 print(f"Reservation Error: {error_message}")
 
-        if 'cancel_reservation' in request.POST:
+        elif 'cancel_reservation' in request.POST:
             cancel_reservation_api_url = f"{api_url}cancel_reservation/"
             response = session.post(cancel_reservation_api_url, headers={'X-CSRFToken': csrf_token})
             if response.status_code == 200:
@@ -108,21 +107,35 @@ def book_detail(request, pk):
                 error_message = response.json().get('detail', 'Canceling reservation failed.')
                 print(f"Cancel Reservation Error: {error_message}")
 
+        elif 'wish' in request.POST:
+            wish_api_url = f"{api_url}wish/"
+            response = session.post(wish_api_url, headers={'X-CSRFToken': csrf_token})
+            if response.status_code == 200:
+                return redirect('book_detail', pk=pk)
+            else:
+                error_message = response.json().get('detail', 'Wish creation failed.')
+                print(f"Wish Error: {error_message}")
+
+        elif 'remove_wish' in request.POST:
+            remove_wish_api_url = f"{api_url}remove_wish/"
+            response = session.post(remove_wish_api_url, headers={'X-CSRFToken': csrf_token})
+            if response.status_code == 200:
+                return redirect('book_detail', pk=pk)
+            else:
+                error_message = response.json().get('detail', 'Removing wish failed.')
+                print(f"Remove Wish Error: {error_message}")
+
     response = session.get(api_url, headers={'X-CSRFToken': csrf_token})
+    user_status_response = session.get(user_status_url, headers={'X-CSRFToken': csrf_token})
 
-    if response.status_code == 200:
+    if response.status_code == 200 and user_status_response.status_code == 200:
         book = response.json()
+        user_status = user_status_response.json()
         book['is_available'] = book['quantity'] > (book['currently_borrowed_count'] + book['active_reservations_count'])
-
-        # Check if the current user has an active reservation for this book
-        reservation_api_url = f"{settings.API_URL}/library/books/{pk}/cancel_reservation/"
-        reservation_check_response = session.get(reservation_api_url, headers={'X-CSRFToken': csrf_token})
-
-        if reservation_check_response.status_code == 200:
-            reservations = reservation_check_response.json().get('results', [])
-            book['user_has_reservation'] = any(reservation['user'] == request.user.id for reservation in reservations)
-        else:
-            book['user_has_reservation'] = False
+        book['user_has_reservation'] = user_status['has_active_reservation']
+        book['user_has_borrowing'] = user_status['has_active_borrowing']
+        book['user_has_wish'] = user_status['has_wish']
+        book['user_has_any_active_reservation'] = user_status['has_any_active_reservation']
     else:
         book = {}
 

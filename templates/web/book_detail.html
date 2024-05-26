@@ -18,7 +18,7 @@
 
 <br><br>
 
-{% if book.is_available and not book.user_has_reservation %}
+{% if book.is_available and not book.user_has_reservation and not book.user_has_any_active_reservation %}
     <form method="post" action="{% url 'book_detail' book.id %}">
         {% csrf_token %}
         <button type="submit" name="reserve">Reserve</button>
@@ -28,7 +28,20 @@
         {% csrf_token %}
         <button type="submit" name="cancel_reservation">Cancel Reservation</button>
     </form>
+{% elif not book.is_available %}
+    {% if not book.user_has_wish %}
+        <form method="post" action="{% url 'book_detail' book.id %}">
+            {% csrf_token %}
+            <button type="submit" name="wish">Make a Wish</button>
+        </form>
+    {% else %}
+        <form method="post" action="{% url 'book_detail' book.id %}">
+            {% csrf_token %}
+            <button type="submit" name="remove_wish">Remove Wish</button>
+        </form>
+    {% endif %}
 {% else %}
     <p>This book is currently unavailable for reservation.</p>
 {% endif %}
+
 {% endblock content %}

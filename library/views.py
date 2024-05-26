@@ -1,17 +1,42 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Count, Q, F
-from django.utils import timezone
+from django.db.models import Count, F
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import viewsets, status, permissions, filters
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 
 from library.permissions import IsLibrarian
 from library.models import Author, Genre, Book, Reservation, Borrow
 from library.serializers import AuthorSerializer, GenreSerializer, BookSerializer, ReservationSerializer, \
-    BookListSerializer, EmptySerializer, BorrowSerializer, CustomUserSerializer
+    BookListSerializer, EmptySerializer, BorrowSerializer, CustomUserSerializer, UserBookStatusSerializer
 from users.models import CustomUser
+
+
+@api_view(['GET'])
+def user_book_status(request, pk):
+    """
+    View to get the user's status for a specific book.
+    """
+    user = request.user
+    book = Book.objects.get(pk=pk)
+
+    has_active_reservation = Reservation.objects.filter(user=user, book=book, is_active=True).exists()
+    has_active_borrowing = Borrow.objects.filter(user=user, book=book, returned_at__isnull=True).exists()
+    has_wish = book.wished_by.filter(pk=user.pk).exists()
+    is_available = book.is_available
+    has_any_active_reservation = Reservation.objects.filter(user=user, is_active=True).exists()
+
+    data = {
+        'has_active_reservation': has_active_reservation,
+        'has_active_borrowing': has_active_borrowing,
+        'has_wish': has_wish,
+        'is_available': is_available,
+        'has_any_active_reservation': has_any_active_reservation
+    }
+
+    serializer = UserBookStatusSerializer(data)
+    return Response(serializer.data)
 
 
 class AuthorViewSet(viewsets.ModelViewSet):
@@ -171,7 +196,6 @@ class StatisticsViewSet(viewsets.ViewSet):
     """
     ViewSet for library statistics.
     """
-
     @action(detail=False, methods=['get'])
     def popular_books(self, request):
         """

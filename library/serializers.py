@@ -1,10 +1,6 @@
-from django.utils import timezone
 from django.contrib.auth import get_user_model
-
 from rest_framework import serializers
-
 from library.models import Author, Genre, Book, Reservation, Borrow
-from library.validators import validate_no_active_borrowing, validate_no_active_reservation
 
 User = get_user_model()
 
@@ -81,3 +77,12 @@ class BorrowSerializer(serializers.ModelSerializer):
 class EmptySerializer(serializers.Serializer):
     """Empty serializer to be used for wish endpoints"""
     pass
+
+
+class UserBookStatusSerializer(serializers.Serializer):
+    """Serializer for user_book_status endpoint"""
+    has_active_reservation = serializers.BooleanField()
+    has_active_borrowing = serializers.BooleanField()
+    has_wish = serializers.BooleanField()
+    is_available = serializers.BooleanField()
+    has_any_active_reservation = serializers.BooleanField()
