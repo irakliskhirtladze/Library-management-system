@@ -60,15 +60,15 @@ EMAIL_PORT=587
 If you already have actual email setup for app testing, then replace placeholder values in .env file. Otherwise, leave it
 as shown above.
 
-3. Apply migrations:
+4. Apply migrations:
 ```
 python manage.py migrate
 ```
-4. Populate the database with initial data (random book names, authors and genres):
+5. Populate the database with initial data (random book names, authors and genres):
 ```
 python manage.py populate_db
 ```
-5. To create admin user run the command below and then follow the instructions:
+6. To create admin user run the command below and then follow the instructions:
 ```
 python manage.py createsuperuser
 ```
